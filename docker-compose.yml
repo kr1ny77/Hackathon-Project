@@ -1,0 +1,74 @@
+version: "3.8"
+
+services:
+  # PostgreSQL Database
+  db:
+    image: postgres:16-alpine
+    container_name: medreminder-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medreminder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medreminder_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-medreminder}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-medreminder} -d ${POSTGRES_DB:-medreminder}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - medreminder-net
+
+  # FastAPI Backend
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: medreminder-backend
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-medreminder}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-medreminder_pass}
+      POSTGRES_DB: ${POSTGRES_DB:-medreminder}
+      POSTGRES_HOST: db
+      POSTGRES_PORT: 5432
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - medreminder-net
+    command: >
+      sh -c "
+        alembic upgrade head &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000
+      "
+
+  # Telegram Bot
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: medreminder-bot
+    restart: unless-stopped
+    environment:
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      BACKEND_URL: http://backend:8000/api
+      REMINDER_CHECK_INTERVAL: ${REMINDER_CHECK_INTERVAL:-30}
+    depends_on:
+      - backend
+    networks:
+      - medreminder-net
+
+volumes:
+  postgres_data:
+
+networks:
+  medreminder-net:
+    driver: bridge
