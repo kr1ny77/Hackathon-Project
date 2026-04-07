@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from sqlalchemy import (
-    Column, Integer, BigInteger, String, Text, DateTime, Time, ForeignKey, Enum as SAEnum
+    Column, Integer, BigInteger, String, Boolean, DateTime, Time, ForeignKey, Enum as SAEnum
 )
 from sqlalchemy.orm import DeclarativeBase, relationship
 import enum
@@ -39,7 +39,7 @@ class Medicine(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     name = Column(String(200), nullable=False)
-    dosage = Column(String(100), nullable=False)  # e.g., "1 tablet", "5ml"
+    dosage = Column(String(100), nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     user = relationship("User", back_populates="medicines")
@@ -52,8 +52,8 @@ class ReminderSchedule(Base):
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     medicine_id = Column(Integer, ForeignKey("medicines.id"), nullable=False, index=True)
-    reminder_time = Column(Time, nullable=False)  # Time of day for the reminder
-    is_active = Column(SAEnum, default=True)
+    reminder_time = Column(Time, nullable=False)
+    is_active = Column(Boolean, default=True)
 
     medicine = relationship("Medicine", back_populates="schedules")
     intakes = relationship("IntakeHistory", back_populates="schedule", cascade="all, delete-orphan")
@@ -66,10 +66,10 @@ class IntakeHistory(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     schedule_id = Column(Integer, ForeignKey("reminder_schedules.id"), nullable=False, index=True)
-    medicine_name = Column(String(200), nullable=False)  # Snapshot for history
-    scheduled_time = Column(DateTime, nullable=False)  # Exact datetime when reminder fired
-    status = Column(SAEnum(IntakeStatus), default=IntakeStatus.PENDING)
-    responded_at = Column(DateTime, nullable=True)  # When user responded
+    medicine_name = Column(String(200), nullable=False)
+    scheduled_time = Column(DateTime, nullable=False)
+    status = Column(SAEnum(IntakeStatus, name="intakestatus"), default=IntakeStatus.PENDING)
+    responded_at = Column(DateTime, nullable=True)
 
     user = relationship("User", back_populates="intakes")
     schedule = relationship("ReminderSchedule", back_populates="intakes")

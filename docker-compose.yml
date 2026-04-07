@@ -1,5 +1,4 @@
 services:
-  # PostgreSQL Database
   db:
     image: postgres:16-alpine
     container_name: medreminder-db
@@ -21,11 +20,8 @@ services:
     networks:
       - medreminder-net
 
-  # FastAPI Backend
   backend:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: medreminder-backend:latest
     container_name: medreminder-backend
     restart: unless-stopped
     environment:
@@ -42,17 +38,10 @@ services:
         condition: service_healthy
     networks:
       - medreminder-net
-    command: >
-      sh -c "
-        alembic upgrade head &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000
-      "
+    command: ["sh", "-c", "export PYTHONPATH=/app && python app/db/init_db.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"]
 
-  # Telegram Bot
   bot:
-    build:
-      context: ./bot
-      dockerfile: Dockerfile
+    image: medreminder-bot:latest
     container_name: medreminder-bot
     restart: unless-stopped
     environment:
