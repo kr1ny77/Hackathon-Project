@@ -1,18 +1,19 @@
 # Medicine Reminder 💊⏰
 
-> A Telegram bot-based service that helps users remember to take medicines on time, with an AI assistant powered by GigaChat for medicine questions and natural-language requests.
+> A Telegram bot-based service that helps users remember to take medicines on time, with an AI assistant powered by GigaChat for medicine questions, natural-language requests, and full medicine management via text.
 
 ---
 
 ## Demo
 
-> _Open Telegram, find @InnoMedicineReminder_bot and send `/start`_
+> _Open Telegram, find **@InnoMedicineReminder_bot** and start chatting_
 
-- Add medicines with name and dosage
-- Set reminder times (multiple per medicine)
+- Add medicines: *"Add Aspirin at 08:00 and Ibuprofen at 19:00"*
+- Set and change reminder times naturally
 - Receive grouped reminders with **Taken** / **Remind in 5 min** buttons
 - Ask about any medicine: *"What is Aspirin?"*
-- Add medicines naturally: *"Add Aspirin at 08:00 and Ibuprofen at 19:00"*
+- Manage everything via text — no buttons needed
+- Edit name, dosage, delete reminders, delete medicines — all via natural language
 
 ---
 
@@ -25,13 +26,13 @@ People who need simple, timely medicine reminders and want to track whether they
 Users forget to take medicines on time and have no simple way to track whether a dose was taken or missed.
 
 ### Solution
-A Telegram bot that sends timely reminders, lets users confirm intake with one tap, stores all data in PostgreSQL, and includes an AI assistant for medicine questions and natural-language requests.
+A Telegram bot that sends timely reminders, lets users confirm intake with one tap, stores all data in PostgreSQL, and includes an AI assistant for medicine questions and natural-language medicine management.
 
 ### Project Idea (One Sentence)
 A Telegram bot-based medicine reminder system with AI-powered assistant, dose tracking, and intake history.
 
 ### Core Feature
-The bot sends grouped reminders at scheduled times and allows users to press **Taken** or **Missed** buttons, while the backend stores schedules and history in PostgreSQL.
+The bot sends grouped reminders at scheduled times and allows users to press **Taken** or **Remind in 5 min** buttons, while the backend stores schedules and history in PostgreSQL.
 
 ---
 
@@ -54,7 +55,14 @@ The bot sends grouped reminders at scheduled times and allows users to press **T
 - **Intake history** with grouped counts
 - **Duplicate prevention** for same scheduled dose
 - **Moscow timezone** (UTC+3) support
-- **GigaChat AI** agent: answers medicine questions & parses natural-language requests
+- **GigaChat AI** agent:
+  - Answers medicine/health questions
+  - Parses natural-language requests to add medicines
+  - Changes reminder times via text
+  - Edits medicine name and dosage via text
+  - Deletes reminders and medicines via text
+  - Rejects non-health topics
+  - Full medicine management without buttons
 - All services **dockerized**
 - Full **documentation** and **deployment guide**
 - Pushed to GitHub as `se-toolkit-hackathon`
@@ -65,24 +73,26 @@ The bot sends grouped reminders at scheduled times and allows users to press **T
 
 ### Implemented ✅
 
-| Feature | Command / Action |
-|---------|-----------------|
+| Feature | How to use |
+|---------|-----------|
 | User registration | `/start` or any message |
-| Add medicine | `/add` or type naturally |
-| List medicines | `/medicines` or "My medicines" button |
-| Edit medicine | `/edit` or "Edit / Delete" button |
-| Delete medicine | Edit menu → Delete Medicine |
-| Set reminder time | `/schedule` or "Set reminder" button |
-| Delete reminder time | Edit menu → Delete Reminder → select time |
-| Today's schedule | `/today` or "Today's schedule" button |
-| Intake history | `/history` or "Intake history" button |
-| Help | `/help` |
-| Timely reminder messages | Automatic (Moscow time UTC+3) |
+| Add medicine (text) | *"Add Aspirin at 08:00 and Ibuprofen at 19:00"* |
+| Add medicine (buttons) | Tap "Add medicine" button |
+| Change reminder time | *"Change Aspirin from 08:00 to 09:00"* |
+| Delete reminder time | *"Delete the 08:00 reminder for Aspirin"* |
+| Edit medicine name | *"Rename Aspirin to Acetylsalicylic acid"* |
+| Edit dosage | *"Change Aspirin dosage to 500mg"* |
+| Delete medicine | *"Delete Ibuprofen"* |
+| List medicines | *"What medicines do I have?"* or /medicines |
+| Today's schedule | *"What's my schedule today?"* or /today |
+| Intake history | *"Show my intake history"* or /history |
+| Timely reminders | Automatic (Moscow time UTC+3) |
 | Grouped reminders | One message per medicine (with count) |
-| Taken / Remind in 5 min buttons | Inline keyboard |
+| Taken / Remind buttons | Inline keyboard on reminders |
 | Persistent storage | PostgreSQL |
 | Health check endpoint | `GET /api/health` |
-| **AI assistant (GigaChat)** | Type any question or request |
+| Health topics only | AI refuses non-health questions |
+| Full menu buttons | My medicines, Add, Set reminder, History, Today, Edit |
 
 ### Not Yet Implemented 📋
 - Snooze reminder functionality
@@ -116,13 +126,7 @@ The bot sends grouped reminders at scheduled times and allows users to press **T
 - **Backend (FastAPI)**: Owns all business logic and database access. Exposes REST API endpoints for users, medicines, schedules, intake history, and AI scheduling.
 - **Database (PostgreSQL)**: Stores users, medicines, reminder schedules, and intake history with proper foreign key relationships and cascade deletes.
 - **Scheduler**: Runs inside the bot process. Every 30 seconds, queries the backend for active schedules matching the current minute (Moscow time), creates pending intake records, and sends grouped reminder messages.
-- **GigaChat AI Agent**: Parses natural-language medicine requests ("Add Aspirin at 08:00") and answers medicine-related questions.
-
-### Design Decisions
-- **Polling over Webhook**: Simpler setup, works behind NAT/firewalls, sufficient for a student project with 30-second check intervals.
-- **Separate bot and backend containers**: Clean separation of concerns. Bot handles Telegram + AI, backend owns business logic and data.
-- **SQLAlchemy ORM**: Type-safe queries, async support.
-- **Moscow timezone (UTC+3)**: All reminders use Moscow time.
+- **GigaChat AI Agent**: Parses natural-language medicine requests, changes, deletions, and answers medicine/health questions. Filters non-health topics.
 
 ---
 
@@ -157,12 +161,6 @@ The bot sends grouped reminders at scheduled times and allows users to press **T
                                                                     └───────────────┘
 ```
 
-**Key relationships:**
-- A `user` has many `medicines` (cascade delete)
-- A `medicine` has many `reminder_schedules` (cascade delete)
-- A `reminder_schedule` has many `intake_history` records
-- `intake_history.status` enum: `pending`, `taken`, `missed`
-
 ---
 
 ## API Overview
@@ -171,14 +169,14 @@ The bot sends grouped reminders at scheduled times and allows users to press **T
 |--------|----------|-------------|
 | `GET` | `/api/health` | Health check |
 | `POST` | `/api/users` | Register/get user |
-| `GET` | `/api/users/telegram/{id}` | Get user by Telegram ID |
+| `GET` | `/api/users/id/{id}` | Get user by internal ID |
 | `POST` | `/api/medicines?user_id=N` | Add medicine |
 | `GET` | `/api/medicines/user/{id}` | List user medicines |
 | `GET` | `/api/medicines/{id}?user_id=N` | Get medicine with schedules |
 | `PATCH` | `/api/medicines/{id}?user_id=N` | Update medicine |
 | `DELETE` | `/api/medicines/{id}?user_id=N` | Delete medicine |
 | `POST` | `/api/schedules` | Add reminder time |
-| `GET` | `/api/schedules/medicine/{id}` | List schedules |
+| `PATCH` | `/api/schedules/{id}?reminder_time=X` | Update reminder time |
 | `DELETE` | `/api/schedules/{id}?user_id=N` | Delete schedule |
 | `GET` | `/api/schedules/active/{h}/{m}` | Get active schedules (scheduler) |
 | `GET` | `/api/schedules/active-details/{h}/{m}` | Get active schedules with user+medicine info |
@@ -191,40 +189,37 @@ The bot sends grouped reminders at scheduled times and allows users to press **T
 
 ---
 
-## Bot Commands
+## Bot Commands & AI
 
-| Command | Description |
-|---------|-------------|
-| `/start` | Register with the bot / show main menu |
-| `/add` | Add a new medicine (interactive flow) |
-| `/medicines` | List all medicines with reminder times |
-| `/edit` | Edit medicine name or dosage |
-| `/delete` | Delete a medicine and its reminders |
-| `/schedule` | Add a reminder time for a medicine |
-| `/today` | Show today's medicine schedule |
-| `/history` | View recent intake history |
-| `/help` | Show help message |
-| *(any text)* | AI assistant — asks questions or adds medicines |
+| Input | Description |
+|-------|-------------|
+| `/start` | Register / show main menu |
+| `/add` | Add medicine (interactive) |
+| `/medicines` | List medicines |
+| `/edit` | Edit menu |
+| `/delete` | Delete medicine |
+| `/schedule` | Set reminder time |
+| `/today` | Today's schedule |
+| `/history` | Intake history |
+| `/help` | Help |
+| **Any text** | AI assistant — processes as medicine action or question |
 
----
+### AI Capabilities
 
-## AI Assistant (GigaChat)
-
-The bot integrates **GigaChat** (Sber's LLM) for two purposes:
-
-### 1. Medicine Questions
-Type any question about medicines:
-- *"What is Aspirin?"*
-- *"What are the side effects of Ibuprofen?"*
-- *"Can I take Paracetamol with coffee?"*
-
-### 2. Natural-Language Medicine Addition
-Describe what you need in plain text:
-- *"Add Aspirin at 08:00 and Ibuprofen at 19:00"*
-- *"I need to take Vitamin D 500mg every day at 7pm"*
-- *"Remind me to drink water at 10:00"*
-
-The AI parses the request, extracts medicine names, dosages, and times, then adds them automatically.
+| Natural Language Input | What the AI Does |
+|------------------------|-----------------|
+| *"Add Aspirin at 08:00 and Vitamin D at 19:00"* | Adds both medicines with reminders |
+| *"Change Aspirin from 08:00 to 09:00"* | Updates reminder time |
+| *"Delete the 08:00 reminder for Aspirin"* | Removes specific reminder time |
+| *"Rename Aspirin to Acetylsalicylic acid"* | Edits medicine name |
+| *"Change Aspirin dosage to 500mg"* | Updates dosage |
+| *"Delete Ibuprofen"* | Deletes medicine entirely |
+| *"What medicines do I have?"* | Lists all medicines |
+| *"What's my schedule today?"* | Shows today's schedule |
+| *"Show my intake history"* | Shows intake history |
+| *"What is Aspirin?"* | Answers medicine question |
+| *"What are side effects of Ibuprofen?"* | Answers health question |
+| *"Tell me a joke"* | *"I can only help with medicine and health-related questions."* |
 
 ---
 
