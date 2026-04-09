@@ -4,10 +4,11 @@ from datetime import datetime, date, time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.session import get_db
-from app.models.models import IntakeStatus
+from app.models.models import IntakeStatus, Medicine, ReminderSchedule
 from app.schemas.schemas import (
     UserCreate, UserResponse,
     MedicineCreate, MedicineResponse, MedicineUpdate,
@@ -118,9 +119,8 @@ async def add_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """Add a reminder time for a medicine."""
-    # Verify medicine exists
     result = await db.execute(
-        select(services.Medicine).where(services.Medicine.id == data.medicine_id)
+        select(Medicine).where(Medicine.id == data.medicine_id)
     )
     medicine = result.scalar_one_or_none()
     if not medicine:
@@ -143,14 +143,11 @@ async def delete_schedule(
     db: AsyncSession = Depends(get_db),
 ):
     """Delete a reminder schedule (with user ownership check)."""
-    from sqlalchemy import select as sa_select
-    from app.models.models import Medicine
-
     result = await db.execute(
-        sa_select(services.ReminderSchedule)
-        .join(Medicine, Medicine.id == services.ReminderSchedule.medicine_id)
+        select(ReminderSchedule)
+        .join(Medicine, Medicine.id == ReminderSchedule.medicine_id)
         .where(
-            services.ReminderSchedule.id == schedule_id,
+            ReminderSchedule.id == schedule_id,
             Medicine.user_id == user_id,
         )
     )
@@ -201,7 +198,6 @@ async def create_pending_intake(
     db: AsyncSession = Depends(get_db),
 ):
     """Create a pending intake record when a reminder fires. Used by the scheduler."""
-    # Check for duplicate
     existing = await services.check_duplicate_intake(db, data.schedule_id, data.scheduled_time)
     if existing:
         return existing
@@ -212,7 +208,7 @@ async def create_pending_intake(
     return intake
 
 
-# --- Reminder Scheduler Internal Endpoint ---
+# --- Reminder Scheduler Internal Endpoints ---
 
 @router.get("/schedules/active/{hour}/{minute}", response_model=list[ReminderScheduleResponse])
 async def get_active_schedules_for_time(

@@ -8,7 +8,7 @@ from aiogram.fsm.storage.memory import MemoryStorage
 
 from app.config import get_bot_settings
 from app.handlers.router import router
-from app.services.scheduler import ReminderSchedulerV2
+from app.services.scheduler import ReminderScheduler
 
 logging.basicConfig(
     level=logging.INFO,
@@ -33,7 +33,7 @@ async def main():
     dp.include_router(router)
 
     # Initialize reminder scheduler
-    scheduler = ReminderSchedulerV2(bot)
+    scheduler = ReminderScheduler(bot)
 
     try:
         # Start scheduler

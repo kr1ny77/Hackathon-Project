@@ -32,7 +32,6 @@ class DeleteMedicineState(StatesGroup):
 
 async def cmd_add_medicine(message: Message, state: FSMContext, backend: BackendClient):
     """Start the add medicine flow."""
-    # Check if user is registered
     user = await backend.get_user(message.from_user.id)
     if not user:
         await message.answer("⚠️ Please register first with /start")
@@ -42,7 +41,8 @@ async def cmd_add_medicine(message: Message, state: FSMContext, backend: Backend
     await message.answer(
         "💊 <b>Add Medicine</b>\n\n"
         "What is the <b>name</b> of the medicine?\n"
-        "<i>(e.g., Aspirin, Metformin, Vitamin D)</i>"
+        "(e.g., Aspirin, Metformin, Vitamin D)",
+        parse_mode="HTML",
     )
 
 
@@ -52,7 +52,8 @@ async def handle_medicine_name(message: Message, state: FSMContext, backend: Bac
     await state.set_state(AddMedicineState.waiting_for_dosage)
     await message.answer(
         "📏 What is the <b>dosage</b>?\n"
-        "<i>(e.g., 1 tablet, 5ml, 250mg)</i>"
+        "(e.g., 1 tablet, 5ml, 250mg)",
+        parse_mode="HTML",
     )
 
 
@@ -68,9 +69,10 @@ async def handle_medicine_dosage(message: Message, state: FSMContext, backend: B
     await state.clear()
     await message.answer(
         f"✅ <b>Medicine added!</b>\n\n"
-        f"💊 <b>{medicine['name']}</b>\n"
+        f"💊 {medicine['name']}\n"
         f"📏 Dosage: {medicine['dosage']}\n\n"
-        "Now set reminder times with /schedule"
+        "Now set reminder times with /schedule",
+        parse_mode="HTML",
     )
     logger.info(f"Medicine added: {name} for user {user['id']}")
 
@@ -92,14 +94,13 @@ async def cmd_list_medicines(message: Message, backend: BackendClient):
 
     text = "📋 <b>Your Medicines:</b>\n\n"
     for med in medicines:
-        # Fetch schedules
         schedules = await backend.list_schedules(med["id"])
         times = ", ".join(s["reminder_time"][:5] for s in schedules) if schedules else "No reminders set"
 
         text += f"💊 <b>{med['name']}</b> - {med['dosage']}\n"
         text += f"   ⏰ Reminders: {times}\n\n"
 
-    await message.answer(text)
+    await message.answer(text, parse_mode="HTML")
 
 
 # --- Edit Medicine ---
@@ -152,7 +153,7 @@ async def handle_edit_field_select(callback: CallbackQuery, state: FSMContext, b
         prompt = "Enter the new <b>dosage</b>:"
 
     await state.set_state(EditMedicineState.waiting_for_value)
-    await callback.message.edit_text(prompt)
+    await callback.message.edit_text(prompt, parse_mode="HTML")
     await callback.answer()
 
 
@@ -169,7 +170,8 @@ async def handle_edit_value(message: Message, state: FSMContext, backend: Backen
     await state.clear()
     await message.answer(
         f"✅ <b>Updated!</b>\n\n"
-        f"💊 {updated['name']} - {updated['dosage']}"
+        f"💊 {updated['name']} - {updated['dosage']}",
+        parse_mode="HTML",
     )
 
 

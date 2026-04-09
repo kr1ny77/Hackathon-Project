@@ -41,7 +41,7 @@ async def cmd_history(message: Message, backend: BackendClient):
         dt = entry["scheduled_time"][:16].replace("T", " ")
         text += f"{status_emoji} <b>{dt}</b> - {entry['medicine_name']}\n"
 
-    await message.answer(text)
+    await message.answer(text, parse_mode="HTML")
 
 
 async def cb_intake_action(callback: CallbackQuery, backend: BackendClient):
@@ -54,7 +54,6 @@ async def cb_intake_action(callback: CallbackQuery, backend: BackendClient):
     action = parts[1]  # "taken" or "missed"
     intake_id = int(parts[2])
 
-    # Update intake status
     try:
         result = await backend.record_intake(intake_id, action)
         status_emoji = "✅" if action == "taken" else "❌"
@@ -65,12 +64,13 @@ async def cb_intake_action(callback: CallbackQuery, backend: BackendClient):
             f"Medicine: {result.get('medicine_name', 'Unknown')}\n"
             f"Status: {status_text.upper()}\n"
             f"Time: {datetime.utcnow().strftime('%H:%M')}\n\n"
-            f"{'💪 Keep it up!' if action == 'taken' else '⚠️ Try to take your medicine on time next time.'}"
+            f"{'Keep it up!' if action == 'taken' else 'Try to take your medicine on time next time.'}",
+            parse_mode="HTML",
         )
         logger.info(f"Intake {intake_id} recorded as {action}")
     except Exception as e:
         logger.error(f"Error recording intake {intake_id}: {e}")
-        await callback.answer("❌ Could not record response. Try again.", show_alert=True)
+        await callback.answer("Could not record response. Try again.", show_alert=True)
 
     await callback.answer()
 

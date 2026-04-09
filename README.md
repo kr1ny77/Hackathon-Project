@@ -1,12 +1,20 @@
 # Medicine Reminder 💊⏰
 
-> A Telegram bot-based service that helps users remember to take medicines on time, track intake history, and manage medication schedules.
+> A Telegram bot-based service that helps users remember to take medicines on time, with an AI assistant powered by GigaChat for medicine questions and natural-language requests.
+
+---
 
 ## Demo
 
-![Demo placeholder - bot interaction screenshot](https://via.placeholder.com/600x400/4CAF50/ffffff?text=Medicine+Reminder+Bot+Demo)
+> _Open Telegram, find @InnoMedicineReminder_bot and send `/start`_
 
-> _Screenshot: User adds a medicine, sets a reminder time, and receives a reminder with Taken/Missed buttons._
+- Add medicines with name and dosage
+- Set reminder times (multiple per medicine)
+- Receive grouped reminders with **Taken** / **Remind in 5 min** buttons
+- Ask about any medicine: *"What is Aspirin?"*
+- Add medicines naturally: *"Add Aspirin at 08:00 and Ibuprofen at 19:00"*
+
+---
 
 ## Product Context
 
@@ -17,13 +25,13 @@ People who need simple, timely medicine reminders and want to track whether they
 Users forget to take medicines on time and have no simple way to track whether a dose was taken or missed.
 
 ### Solution
-A Telegram bot that sends timely reminders, lets users confirm intake with one tap, and stores all data in a database for later review.
+A Telegram bot that sends timely reminders, lets users confirm intake with one tap, stores all data in PostgreSQL, and includes an AI assistant for medicine questions and natural-language requests.
 
 ### Project Idea (One Sentence)
-A Telegram bot-based medicine reminder system with dose tracking and intake history.
+A Telegram bot-based medicine reminder system with AI-powered assistant, dose tracking, and intake history.
 
 ### Core Feature
-The bot sends reminders at scheduled times and allows users to press "Taken" or "Missed" buttons, while the backend stores schedules and history in PostgreSQL.
+The bot sends grouped reminders at scheduled times and allows users to press **Taken** or **Missed** buttons, while the backend stores schedules and history in PostgreSQL.
 
 ---
 
@@ -33,19 +41,20 @@ The bot sends reminders at scheduled times and allows users to press "Taken" or 
 - User starts bot with `/start` and gets registered
 - Add a medicine with name and dosage
 - Set one or more reminder times per medicine
-- Bot sends reminders at scheduled times via polling
-- Inline buttons: **Taken** / **Missed**
+- Bot sends grouped reminders at scheduled times via polling
+- Inline buttons: **Taken** / **Remind in 5 min**
 - Intake history saved to PostgreSQL
 - Backend API + database + bot running via Docker Compose
 
-### Version 2 — Polish & Production (Current)
+### Version 2 — Polish & AI (Current)
 - **Edit** medicine name/dosage
 - **Delete** medicine (with cascade cleanup)
 - **List** all medicines with their reminder times
-- **Today's schedule** view
-- **Intake history** command
+- **Today's schedule** view (ascending order, hides past times)
+- **Intake history** with grouped counts
 - **Duplicate prevention** for same scheduled dose
-- **Validation** and error handling improvements
+- **Moscow timezone** (UTC+3) support
+- **GigaChat AI** agent: answers medicine questions & parses natural-language requests
 - All services **dockerized**
 - Full **documentation** and **deployment guide**
 - Pushed to GitHub as `se-toolkit-hackathon`
@@ -55,28 +64,32 @@ The bot sends reminders at scheduled times and allows users to press "Taken" or 
 ## Features
 
 ### Implemented ✅
-| Feature | Command |
-|---------|---------|
-| User registration | `/start` |
-| Add medicine | `/add` |
-| List medicines | `/medicines` |
-| Edit medicine | `/edit` |
-| Delete medicine | `/delete` |
-| Set reminder time | `/schedule` |
-| Today's schedule | `/today` |
-| Intake history | `/history` |
+
+| Feature | Command / Action |
+|---------|-----------------|
+| User registration | `/start` or any message |
+| Add medicine | `/add` or type naturally |
+| List medicines | `/medicines` or "My medicines" button |
+| Edit medicine | `/edit` or "Edit / Delete" button |
+| Delete medicine | Edit menu → Delete Medicine |
+| Set reminder time | `/schedule` or "Set reminder" button |
+| Delete reminder time | Edit menu → Delete Reminder → select time |
+| Today's schedule | `/today` or "Today's schedule" button |
+| Intake history | `/history` or "Intake history" button |
 | Help | `/help` |
-| Timely reminder messages | Automatic |
-| Taken/Missed inline buttons | Automatic |
+| Timely reminder messages | Automatic (Moscow time UTC+3) |
+| Grouped reminders | One message per medicine (with count) |
+| Taken / Remind in 5 min buttons | Inline keyboard |
 | Persistent storage | PostgreSQL |
 | Health check endpoint | `GET /api/health` |
+| **AI assistant (GigaChat)** | Type any question or request |
 
 ### Not Yet Implemented 📋
-- Multiple medicines in one message
 - Snooze reminder functionality
 - Statistics / adherence reports
 - Web admin dashboard
 - Webhook mode (currently uses polling)
+- Multi-language support
 
 ---
 
@@ -87,29 +100,29 @@ The bot sends reminders at scheduled times and allows users to press "Taken" or 
 │   Telegram   │  HTTP   │   FastAPI    │  SQL   │  PostgreSQL  │
 │     Bot      │◄──────►│   Backend    │◄──────►│  Database    │
 │  (aiogram)   │  API   │  (Python)    │  ORM   │              │
-└──────────────┘        └──────────────┘        └──────────────┘
-       │                        │
-       │  Polls every 30s       │
-       │  for due reminders     │
-       ▼                        │
-┌──────────────┐                │
-│  Scheduler   │────────────────┘
-│  (inside bot)│  Creates intake records,
-│              │  sends messages to users
-└──────────────┘
+└──────┬───────┘        └──────────────┘        └──────────────┘
+       │  Polls every 30s  ▲
+       │  for reminders    │
+       ├───────────────────┤
+       │  GigaChat AI API  │
+       │  (questions &     │
+       │   natural parse)  │
+       └───────────────────┘
 ```
 
 ### Components
 
-- **Bot (aiogram)**: Telegram-facing client. Handles user commands, displays inline keyboards, and runs a background scheduler that polls for due reminders every 30 seconds.
-- **Backend (FastAPI)**: Owns all business logic and database access. Exposes REST API endpoints for users, medicines, schedules, and intake history.
+- **Bot (aiogram)**: Telegram-facing client. Handles user messages, displays inline keyboards, runs a background scheduler (every 30s), and routes natural-language messages to GigaChat AI.
+- **Backend (FastAPI)**: Owns all business logic and database access. Exposes REST API endpoints for users, medicines, schedules, intake history, and AI scheduling.
 - **Database (PostgreSQL)**: Stores users, medicines, reminder schedules, and intake history with proper foreign key relationships and cascade deletes.
-- **Scheduler**: Runs inside the bot process. Every 30 seconds, queries the backend for active schedules matching the current minute, creates pending intake records, and sends reminder messages.
+- **Scheduler**: Runs inside the bot process. Every 30 seconds, queries the backend for active schedules matching the current minute (Moscow time), creates pending intake records, and sends grouped reminder messages.
+- **GigaChat AI Agent**: Parses natural-language medicine requests ("Add Aspirin at 08:00") and answers medicine-related questions.
 
 ### Design Decisions
-- **Polling over Webhook**: Chosen for simplicity. Works behind NAT/firewalls, easier to debug, sufficient for a student project with 30-second check intervals.
-- **Separate bot and backend containers**: Clean separation of concerns. Bot handles Telegram communication, backend owns business logic and data.
-- **SQLAlchemy ORM**: Type-safe queries, async support, easy migrations with Alembic.
+- **Polling over Webhook**: Simpler setup, works behind NAT/firewalls, sufficient for a student project with 30-second check intervals.
+- **Separate bot and backend containers**: Clean separation of concerns. Bot handles Telegram + AI, backend owns business logic and data.
+- **SQLAlchemy ORM**: Type-safe queries, async support.
+- **Moscow timezone (UTC+3)**: All reminders use Moscow time.
 
 ---
 
@@ -121,7 +134,7 @@ The bot sends reminders at scheduled times and allows users to press "Taken" or 
 | Backend API | FastAPI (Python) |
 | Database | PostgreSQL 16 |
 | ORM | SQLAlchemy 2.x (async) |
-| Migrations | Alembic |
+| AI Agent | GigaChat (Sber) |
 | Scheduling | Custom polling loop (asyncio) |
 | Containerization | Docker + Docker Compose |
 | Server | Ubuntu 24.04 VM |
@@ -137,7 +150,7 @@ The bot sends reminders at scheduled times and allows users to press "Taken" or 
 │ id      │       │ id        │       │ id                 │       │ id            │
 │ tg_id   │  1:N  │ user_id   │  1:N  │ medicine_id        │  1:N  │ user_id       │
 │ username│       │ name      │       │ reminder_time      │       │ schedule_id   │
-│ f_name  │       │ dosage    │       │ is_active          │       │ medicine_name │
+│ f_name  │       │ dosage    │       │ is_active (bool)   │       │ medicine_name │
 │ reg_at  │       │ created_at│       │                    │       │ scheduled_time│
 └─────────┘       └───────────┘       └────────────────────┘       │ status        │
                                                                     │ responded_at  │
@@ -171,6 +184,8 @@ The bot sends reminders at scheduled times and allows users to press "Taken" or 
 | `GET` | `/api/schedules/active-details/{h}/{m}` | Get active schedules with user+medicine info |
 | `POST` | `/api/intakes` | Record taken/missed |
 | `POST` | `/api/intakes/pending` | Create pending intake (scheduler) |
+| `POST` | `/api/intakes/reschedule` | Reschedule intake (+5 min) |
+| `GET` | `/api/intakes/pending-due` | Get due pending intakes |
 | `GET` | `/api/intakes/user/{id}` | Get intake history |
 | `GET` | `/api/intakes/today/{id}` | Get today's intakes |
 
@@ -180,27 +195,48 @@ The bot sends reminders at scheduled times and allows users to press "Taken" or 
 
 | Command | Description |
 |---------|-------------|
-| `/start` | Register with the bot |
+| `/start` | Register with the bot / show main menu |
 | `/add` | Add a new medicine (interactive flow) |
-| `/medicines` | List all your medicines with reminder times |
+| `/medicines` | List all medicines with reminder times |
 | `/edit` | Edit medicine name or dosage |
 | `/delete` | Delete a medicine and its reminders |
 | `/schedule` | Add a reminder time for a medicine |
 | `/today` | Show today's medicine schedule |
 | `/history` | View recent intake history |
 | `/help` | Show help message |
+| *(any text)* | AI assistant — asks questions or adds medicines |
+
+---
+
+## AI Assistant (GigaChat)
+
+The bot integrates **GigaChat** (Sber's LLM) for two purposes:
+
+### 1. Medicine Questions
+Type any question about medicines:
+- *"What is Aspirin?"*
+- *"What are the side effects of Ibuprofen?"*
+- *"Can I take Paracetamol with coffee?"*
+
+### 2. Natural-Language Medicine Addition
+Describe what you need in plain text:
+- *"Add Aspirin at 08:00 and Ibuprofen at 19:00"*
+- *"I need to take Vitamin D 500mg every day at 7pm"*
+- *"Remind me to drink water at 10:00"*
+
+The AI parses the request, extracts medicine names, dosages, and times, then adds them automatically.
 
 ---
 
 ## Usage — Step by Step
 
 1. **Start the bot**: Open Telegram, find your bot, send `/start`
-2. **Add a medicine**: Send `/add`, then type the medicine name, then the dosage
-3. **Set a reminder**: Send `/schedule`, select the medicine, then type the time (e.g., `08:00`)
-4. **Receive reminders**: At the scheduled time, the bot sends a message with Taken/Missed buttons
-5. **Record intake**: Tap ✅ **Taken** or ❌ **Missed**
-6. **View history**: Send `/history` to see your recent records
-7. **Manage medicines**: Use `/medicines`, `/edit`, `/delete` to manage your list
+2. **Add a medicine**: Tap "Add medicine" or type naturally: *"Add Aspirin at 08:00"*
+3. **Set a reminder**: Tap "Set reminder" → select medicine → type time (e.g., `08:00`)
+4. **Receive reminders**: At the scheduled time (Moscow time), the bot sends a grouped message
+5. **Record intake**: Tap ✅ **Taken** or ⏰ **Remind in 5 min**
+6. **View history**: Tap "Intake history" to see your recent records
+7. **Ask questions**: Type anything like *"What is Vitamin D?"*
 
 ---
 
@@ -211,132 +247,77 @@ Ubuntu 24.04 VM
 
 ### Prerequisites
 ```bash
-# Install Docker and Docker Compose
 sudo apt-get update
 sudo apt-get install -y docker.io docker-compose-v2
 sudo systemctl enable docker
 sudo systemctl start docker
-
-# Verify
-docker --version
-docker compose version
 ```
 
-### Quick Deploy (One Command)
+### Quick Deploy
 
 ```bash
-# Clone the repository
 git clone https://github.com/YOUR_USERNAME/se-toolkit-hackathon.git
 cd se-toolkit-hackathon
 
 # .env is already configured with the bot token
-# Build and start all services
 docker compose up -d --build
 
-# Check status
+# Verify
 docker compose ps
-
-# Verify backend is running
 curl http://localhost:8000/api/health
 ```
 
 ### Environment Variables
 
-All settings are in `.env`. The default values work out of the box:
+All settings are in `.env`:
 
 ```env
 TELEGRAM_BOT_TOKEN=8797131965:AAEDqh2vpfGM83cPSObIDRsikWTgQhTABTY
-
 POSTGRES_USER=medreminder
 POSTGRES_PASSWORD=medreminder_pass
 POSTGRES_DB=medreminder
 POSTGRES_PORT=5432
-
 BACKEND_PORT=8000
-
 REMINDER_CHECK_INTERVAL=30
 ```
 
 ### Build and Run
 
 ```bash
-# Start all services
 docker compose up -d --build
-
-# View logs
 docker compose logs -f
-
-# View specific service logs
 docker compose logs -f bot
 docker compose logs -f backend
-docker compose logs -f db
 ```
 
 ### Database Migrations
 
-Migrations run automatically on startup via the backend container's entrypoint:
-```bash
-alembic upgrade head
-```
-
-To run migrations manually:
-```bash
-docker compose exec backend alembic upgrade head
-```
-
-To create a new migration after model changes:
-```bash
-docker compose exec backend alembic revision --autogenerate -m "description"
-docker compose exec backend alembic upgrade head
-```
+Tables are created automatically on first startup via the backend's `init_db.py` script.
 
 ### Restart
 
 ```bash
-# Restart all services
 docker compose restart
-
-# Restart a specific service
 docker compose restart bot
-
-# Full rebuild
 docker compose down
 docker compose up -d --build
 ```
 
-### Stop
-
-```bash
-docker compose down
-```
-
 ---
 
-## ⚠️ Important: Telegram Bot on University VMs
+## ⚠️ Telegram Bot on University VMs
 
-**Problem**: Telegram bot traffic (polling or webhooks) is often **blocked on university VMs** due to network restrictions or firewalls.
+**Problem**: Telegram bot traffic is often **blocked on university VMs**.
 
 **Solutions**:
 
 ### Option A: Deploy on a Non-University VM (Recommended)
-Use a personal cloud VM (e.g., DigitalOcean, Hetzner, AWS, Oracle Cloud Free Tier):
-1. Create a VM on any cloud provider
-2. Follow the deployment steps above
-3. The bot will work without restrictions
+Use a personal cloud VM (DigitalOcean, Hetzner, AWS, Oracle Cloud Free Tier).
 
-### Option B: Use the Provided VM
-The project is configured to deploy to `10.93.24.132`. If Telegram polling works on this VM, the bot will function normally. If not, use Option A.
-
-### Option C: Local Development + Remote Backend
+### Option B: Local Bot + Remote Backend
 - Run the **backend + database** on the VM
-- Run the **bot** locally on your machine (where Telegram is not blocked)
+- Run the **bot** locally on your machine
 - Update the bot's `BACKEND_URL` in `.env` to point to the VM's IP
-
-**This project uses polling mode** (not webhook) because:
-- No DNS or SSL certificate needed
-- Works behind NAT/firewalls
-- Simpler to set up and debug
-- 30-second polling interval is responsive enough for medicine reminders
 
 ---
 
@@ -344,53 +325,46 @@ The project is configured to deploy to `10.93.24.132`. If Telegram polling works
 
 ```
 se-toolkit-hackathon/
-├── .env                        # Environment variables (with bot token)
-├── .env.example                # Template for environment variables
-├── .gitignore                  # Git ignore rules
-├── docker-compose.yml          # Docker Compose configuration
-├── LICENSE                     # MIT License
+├── .env                        # Environment variables
+├── .env.example                # Template
+├── .gitignore
+├── docker-compose.yml          # All 3 services: db, backend, bot
+├── LICENSE                     # MIT
 ├── README.md                   # This file
+│
 ├── backend/
-│   ├── Dockerfile              # Backend container definition
-│   ├── requirements.txt        # Python dependencies
-│   ├── alembic.ini             # Alembic migration config
+│   ├── Dockerfile
+│   ├── requirements.txt
 │   └── app/
-│       ├── main.py             # FastAPI application entry point
-│       ├── core/
-│       │   └── config.py       # Application settings
-│       ├── db/
-│       │   └── session.py      # Database session management
-│       ├── models/
-│       │   └── models.py       # SQLAlchemy ORM models
-│       ├── schemas/
-│       │   └── schemas.py      # Pydantic request/response schemas
-│       ├── services/
-│       │   └── services.py     # Business logic layer
-│       └── api/
-│           └── endpoints.py    # REST API route definitions
-│       └── alembic/
-│           ├── env.py          # Alembic environment config
-│           └── versions/
-│               └── 001_initial_schema.py  # Initial migration
+│       ├── main.py             # FastAPI entry point
+│       ├── core/config.py      # Application settings
+│       ├── db/session.py       # Database session
+│       ├── db/init_db.py       # Database initialization
+│       ├── models/models.py    # SQLAlchemy ORM models
+│       ├── schemas/schemas.py  # Pydantic schemas
+│       ├── services/services.py # Business logic
+│       └── api/endpoints.py    # REST API routes
+│
 ├── bot/
-│   ├── Dockerfile              # Bot container definition
-│   ├── requirements.txt        # Python dependencies
+│   ├── Dockerfile
+│   ├── requirements.txt
 │   └── app/
 │       ├── main.py             # Bot entry point
 │       ├── config.py           # Bot settings
 │       ├── handlers/
-│       │   ├── router.py       # Handler registrations & routing
-│       │   ├── start.py        # /start command handler
-│       │   ├── medicine.py     # Add/edit/list/delete medicine
+│       │   ├── router.py       # Command/callback routing
+│       │   ├── start.py        # /start + main menu
+│       │   ├── medicine.py     # Add/edit/list/delete
 │       │   ├── schedule.py     # Set reminder times
-│       │   └── intake.py       # Intake history & button callbacks
+│       │   ├── intake.py       # Intake history + buttons
+│       │   └── ai.py           # GigaChat AI handler
 │       └── services/
-│           ├── backend_client.py  # HTTP client for backend API
-│           └── scheduler.py       # Reminder polling scheduler
-├── scripts/
-│   ├── deploy.sh               # VM deployment script
-│   └── run-local.sh            # Local development startup
-└── deploy/                     # Additional deployment files (if needed)
+│           ├── backend_client.py  # HTTP client → backend API
+│           ├── scheduler.py       # Reminder polling scheduler
+│           └── gigachat.py        # GigaChat AI client
+│
+└── scripts/
+    └── (deployment scripts)
 ```
 
 ---
@@ -420,3 +394,4 @@ This project is licensed under the **MIT License** — see the [LICENSE](LICENSE
 - [FastAPI](https://fastapi.tiangolo.com/) — Modern Python web framework
 - [SQLAlchemy](https://www.sqlalchemy.org/) — Python SQL toolkit and ORM
 - [PostgreSQL](https://www.postgresql.org/) — Advanced open-source relational database
+- [GigaChat](https://developers.sber.ru/portal/products/gigachat-api) — Sber's large language model

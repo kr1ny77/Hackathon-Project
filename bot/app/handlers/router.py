@@ -114,10 +114,10 @@ async def handle_help(message: Message):
         "/today - Show today's schedule\n"
         "/history - View intake history\n"
         "/help - Show this help message\n\n"
-        "💡 <i>You'll receive reminders at your scheduled times.\n"
-        "Use the Taken/Missed buttons to record your response.</i>"
+        "You'll receive reminders at your scheduled times.\n"
+        "Use the Taken/Missed buttons to record your response."
     )
-    await message.answer(help_text)
+    await message.answer(help_text, parse_mode="HTML")
 
 
 # --- Callback Query Handlers ---

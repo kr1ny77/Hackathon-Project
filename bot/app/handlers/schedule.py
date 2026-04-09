@@ -50,8 +50,8 @@ async def handle_medicine_select(callback: CallbackQuery, state: FSMContext, bac
     await state.set_state(ScheduleState.waiting_for_time)
     await callback.message.edit_text(
         "⏰ Enter the reminder time in <b>HH:MM</b> format (24-hour).\n"
-        "<i>Examples: 08:00, 14:30, 21:00</i>\n\n"
-        "💡 You can add multiple reminders per medicine."
+        "Examples: 08:00, 14:30, 21:00",
+        parse_mode="HTML",
     )
     await callback.answer()
 
@@ -59,36 +59,58 @@ async def handle_medicine_select(callback: CallbackQuery, state: FSMContext, bac
 async def handle_time_input(message: Message, state: FSMContext, backend: BackendClient):
     """Handle time input, validate, and create schedule."""
     time_str = message.text.strip()
+    logger.info(f"Schedule time input received: '{time_str}'")
 
     # Validate HH:MM format
     if not re.match(r"^([01]?\d|2[0-3]):[0-5]\d$", time_str):
         await message.answer(
             "❌ Invalid format. Please enter time as <b>HH:MM</b> (24-hour).\n"
-            "<i>Examples: 08:00, 14:30, 21:00</i>"
+            "Examples: 08:00, 14:30, 21:00",
+            parse_mode="HTML",
         )
         return
 
-    data = await state.get_data()
-    medicine_id = data["medicine_id"]
+    try:
+        data = await state.get_data()
+        logger.info(f"Schedule state data: {data}")
 
-    # Get medicine name for confirmation
-    med_info = await backend.get_medicine(medicine_id, data["user_id"])
-    if not med_info:
-        await message.answer("❌ Medicine not found.")
+        medicine_id = data.get("medicine_id")
+        user_id = data.get("user_id")
+
+        if not medicine_id or not user_id:
+            await message.answer("❌ Session expired. Please run /schedule again.")
+            await state.clear()
+            return
+
+        # Get medicine name for confirmation
+        med_info = await backend.get_medicine(medicine_id, user_id)
+        if not med_info:
+            await message.answer("❌ Medicine not found.")
+            await state.clear()
+            return
+
+        medicine_name = med_info["medicine"]["name"]
+
+        # Create schedule
+        logger.info(f"Creating schedule: medicine_id={medicine_id}, time={time_str}")
+        schedule = await backend.add_schedule(medicine_id, time_str)
+        logger.info(f"Schedule created: {schedule}")
+
         await state.clear()
-        return
-
-    schedule = await backend.add_schedule(medicine_id, time_str)
-
-    await state.clear()
-    await message.answer(
-        f"✅ <b>Reminder set!</b>\n\n"
-        f"💊 {med_info['medicine']['name']}\n"
-        f"⏰ Time: {time_str}\n\n"
-        "I'll remind you at this time every day.\n"
-        "Use /schedule to add another reminder time."
-    )
-    logger.info(f"Schedule created: medicine {medicine_id} at {time_str}")
+        await message.answer(
+            f"✅ Reminder set!\n\n"
+            f"💊 {medicine_name}\n"
+            f"⏰ Time: {time_str}\n\n"
+            "I'll remind you at this time every day.\n"
+            "Use /schedule to add another reminder time."
+        )
+    except Exception as e:
+        logger.error(f"Error creating schedule: {e}", exc_info=True)
+        await message.answer(
+            f"❌ Error: Could not save reminder.\n\n"
+            f"Details: {str(e)}\n\n"
+            "Try again or contact support."
+        )
 
 
 async def cmd_today_schedule(message: Message, backend: BackendClient):
@@ -108,13 +130,14 @@ async def cmd_today_schedule(message: Message, backend: BackendClient):
     if not items:
         await message.answer(
             "📅 <b>Today's Schedule</b>\n\n"
-            "No medicines scheduled for today. Add medicines and reminder times to get started!"
+            "No medicines scheduled for today. Add medicines and reminder times to get started!",
+            parse_mode="HTML",
         )
         return
 
     text = "📅 <b>Today's Schedule</b>\n\n"
     for item in items:
-        time_str = item["scheduled_time"][11:16]  # Extract HH:MM from datetime
+        time_str = item["scheduled_time"][11:16]
         status_emoji = {
             "pending": "⏳",
             "taken": "✅",
@@ -124,7 +147,7 @@ async def cmd_today_schedule(message: Message, backend: BackendClient):
         text += f"{status_emoji} <b>{time_str}</b> - {item['medicine_name']} ({item['dosage']})\n"
         text += f"   Status: {item['status'].upper()}\n\n"
 
-    await message.answer(text)
+    await message.answer(text, parse_mode="HTML")
 
 
 async def cb_schedule_action(callback: CallbackQuery, state: FSMContext, backend: BackendClient):
@@ -134,8 +157,3 @@ async def cb_schedule_action(callback: CallbackQuery, state: FSMContext, backend
 
     if action == "add":
         await handle_medicine_select(callback, state, backend)
-
-
-async def handle_time_input_handler(message: Message, state: FSMContext, backend: BackendClient):
-    """Handler for time input in schedule flow - exported for router registration."""
-    await handle_time_input(message, state, backend)
